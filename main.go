@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"html/template"
 	"log"
 	"math"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -20,12 +22,18 @@ type Endpoint struct {
 }
 
 type Config struct {
-	Endpoints map[string]Endpoint
+	Http struct {
+		Tls      bool
+		Addr     string
+		CertFile string
+		KeyFile  string
+	}
+	endpoints map[string]Endpoint
 	tmpl      *template.Template
 }
 
 var config = Config{
-	Endpoints: map[string]Endpoint{
+	endpoints: map[string]Endpoint{
 		"/":        {"index.go.html"},
 		"/contact": {"contact.go.html"},
 	},
@@ -84,7 +92,26 @@ func mkServeEndpoint(pattern string, endpoint Endpoint) func(w http.ResponseWrit
 	}
 }
 
+func setupConfig() {
+	configPath := flag.String("config", "config.toml", "Path for the configuration")
+	flag.Parse()
+
+	source, err := os.ReadFile(*configPath)
+	if err != nil {
+		panic(err)
+	}
+	tomlData := string(source)
+
+	_, err = toml.Decode(tomlData, &config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+}
+
 func main() {
+
+	setupConfig()
 
 	mux := http.NewServeMux()
 
@@ -92,12 +119,17 @@ func main() {
 
 	mux.HandleFunc("/static/", serveStatic)
 
-	for pattern, endpoint := range config.Endpoints {
+	for pattern, endpoint := range config.endpoints {
 		mux.HandleFunc(pattern, mkServeEndpoint(pattern, endpoint))
-		log.Printf("Added handler on pattern '%s' based on template '%s'.\n", pattern, endpoint.TmplPath)
+		log.Printf("Added template '%s' for pattern '%s'", endpoint.TmplPath, pattern)
 	}
 
 	mux.HandleFunc("/resume", mkServeMarkdown("markdown/resume.md"))
 
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	switch config.Http.Tls {
+	case false:
+		log.Fatal(http.ListenAndServe(config.Http.Addr, mux))
+	case true:
+		log.Fatal(http.ListenAndServeTLS(config.Http.Addr, config.Http.CertFile, config.Http.KeyFile, mux))
+	}
 }

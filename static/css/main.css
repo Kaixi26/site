@@ -8,6 +8,11 @@ body {
     font-family: Hack;
 }
 
+body > * {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
 nav {
   font-size: large;
   padding-bottom: 2rem;

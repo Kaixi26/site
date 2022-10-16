@@ -1,0 +1,5 @@
+[http]
+tls = false
+certFile = "/etc/letsencrypt/live/www.kaixi.xyz/fullchain.pem"
+keyFile = "/etc/letsencrypt/live/www.kaixi.xyz/privkey.pem"
+addr = ":8080"
