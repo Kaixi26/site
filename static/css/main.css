@@ -1,0 +1,49 @@
+body {
+    max-width: 70rem;
+    color: var(--nord4);
+    background-color: var(--nord0);
+    padding: auto;
+    padding-top: 1rem;
+    margin:auto;
+    font-family: Hack;
+}
+
+nav {
+  font-size: large;
+  padding-bottom: 2rem;
+}
+
+footer {
+  padding-top: 2rem;
+}
+
+hr {
+  border: 0px;
+  border-top: 2px dashed var(--nord15);
+}
+
+a:link {
+  color: var(--nord9);
+}
+
+a:visited {
+  color: var(--nord10);
+}
+
+a:hover {
+  color: var(--nord8);
+}
+
+a:active {
+  color: var(--nord15);
+} 
+
+.rounded {
+  border-radius: 50%;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
