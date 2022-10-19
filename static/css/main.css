@@ -4,8 +4,11 @@ body {
     background-color: var(--nord0);
     padding: auto;
     padding-top: 1rem;
-    margin:auto;
-    font-family: Hack;
+    padding-bottom: 1rem;
+    margin: auto;
+    font-family: sans-serif;
+    text-align: justify;
+    font-size: large;
 }
 
 body > * {
@@ -13,8 +16,12 @@ body > * {
   padding-right: 1rem;
 }
 
+.article h1, .article h2, .article h3, .article h4, .article h5, .article h6 {
+  text-align: center;
+}
+
 nav {
-  font-size: large;
+  font-size: x-large;
   padding-bottom: 2rem;
 }
 

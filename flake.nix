@@ -26,29 +26,39 @@
       pkgs.entr
     ];
 
-  in rec {
-
-    # Gotta clean this up
-    defaultPackage.x86_64-linux = pkgs.stdenv.mkDerivation {
+    site = pkgs.buildGoModule {
       name = "site";
       src = ./.;
-      buildInputs = go;
+      vendorSha256 = "sha256-xPsCwRHeh9HdrR6LwD2kz1w+SslfRgaHqV9MBwlDnNs=";
+      runVend = true;
+
+      nativeBuildInputs = [ pkgs.musl ];
+      CGO_ENABLED = 0;
+      ldflags = [
+        "-linkmode external"
+        "-extldflags '-static -L${pkgs.musl}/lib'"
+      ];
+    };
+
+
+  in rec {
+
+    defaultPackage.x86_64-linux = pkgs.stdenv.mkDerivation {
+      name = "kaixi-site";
+      src = ./.;
+      propagatedBuildInputs = [ site ];
       installPhase = ''
-        export GOCACHE=$TMPDIR/go-cache
-        export GOPATH="$TMPDIR/go"
         mkdir -p "$out/bin/"
         mkdir -p "$out/share/site/"
-        mv static templates $out/share/site/
-        go build
-        mv site $out/bin/
-        printf "#!/bin/sh\ncd $out/share/site\n$out/bin/site\n" > $out/bin/site.sh
+        mv config.toml markdown static templates $out/share/site/
+        printf "#!/bin/sh\ncd $out/share/site\n${site}/bin/site\n" > $out/bin/site.sh
         chmod +x $out/bin/site.sh
       '';
     };
 
     docker = pkgs.dockerTools.buildImage {
       name = "site";
-      copyToRoot = [ pkgs.bash pkgs.toybox ];
+      copyToRoot = [ pkgs.bash pkgs.toybox defaultPackage.x86_64-linux ];
       config = {
         Cmd = [ "${defaultPackage.x86_64-linux}/bin/site.sh" ];
         ExposedPorts = { "8080/tcp" = {}; };

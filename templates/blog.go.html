@@ -1,0 +1,17 @@
+{{template "header.go.html" .}}
+
+<h1>Blog</h1>
+
+<ul>
+    {{range .blogEntries}}
+    <li>
+        <time datetime="2022-07-29T07:53:20-04:00">{{.Date}}</time>
+        -
+        <a href="/blog/{{.Pattern}}">
+            {{.Title}}
+        </a>
+    </li>
+    {{end}}
+</ul>
+
+{{template "footer.go.html" .}}

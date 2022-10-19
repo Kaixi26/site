@@ -8,10 +8,13 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/yuin/goldmark"
+	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
@@ -42,12 +45,11 @@ var config = Config{
 var startTime = time.Now()
 
 var md = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithExtensions(extension.GFM, meta.Meta),
 	goldmark.WithParserOptions(
 		parser.WithAutoHeadingID(),
 	),
 	goldmark.WithRendererOptions(
-		html.WithHardWraps(),
 		html.WithXHTML(),
 	),
 )
@@ -60,13 +62,17 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 func mkServeMarkdown(sourcePath string) func(w http.ResponseWriter, r *http.Request) {
 	source, err := os.ReadFile(sourcePath)
 	if err != nil {
-		panic(err)
+		return func(w http.ResponseWriter, r *http.Request) {
+			http.NotFound(w, r)
+		}
 	}
 
 	var buf bytes.Buffer
-	if err := md.Convert(source, &buf); err != nil {
+	context := parser.NewContext()
+	if err := md.Convert(source, &buf, parser.WithContext(context)); err != nil {
 		panic(err)
 	}
+	metaData := meta.Get(context)
 
 	var html = template.HTML(string(buf.Bytes()))
 
@@ -75,6 +81,7 @@ func mkServeMarkdown(sourcePath string) func(w http.ResponseWriter, r *http.Requ
 			"markdown": html,
 			"uptime":   math.Round(time.Now().Sub(startTime).Seconds()),
 			"cmd":      os.Args[0],
+			"title":    metaData["Title"],
 		})
 	}
 }
@@ -92,8 +99,98 @@ func mkServeEndpoint(pattern string, endpoint Endpoint) func(w http.ResponseWrit
 	}
 }
 
+func mkServeArticle(sourcePath string) func(w http.ResponseWriter, r *http.Request) {
+	source, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return func(w http.ResponseWriter, r *http.Request) {
+			http.NotFound(w, r)
+		}
+	}
+
+	var buf bytes.Buffer
+	context := parser.NewContext()
+	if err := md.Convert(source, &buf, parser.WithContext(context)); err != nil {
+		panic(err)
+	}
+	metaData := meta.Get(context)
+
+	var html = template.HTML(string(buf.Bytes()))
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		config.tmpl.ExecuteTemplate(w, "article.go.html", map[string]any{
+			"markdown": html,
+			"uptime":   math.Round(time.Now().Sub(startTime).Seconds()),
+			"cmd":      os.Args[0],
+			"title":    metaData["Title"],
+		})
+	}
+}
+
+func serveBlog(w http.ResponseWriter, r *http.Request) {
+	type BlogEntry struct {
+		Pattern string
+		Title   string
+		Date    string
+	}
+
+	if r.URL.Path != "/blog/" {
+		mkServeArticle("."+r.URL.Path+".md")(w, r)
+		//http.NotFound(w, r)
+		return
+	}
+
+	var blogEntries = []BlogEntry{}
+	dir, err := os.ReadDir("blog/")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, file := range dir {
+		if file.IsDir() || filepath.Ext(file.Name()) != ".md" {
+			continue
+		}
+
+		data, err := os.ReadFile("blog/" + file.Name())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var buf bytes.Buffer
+		context := parser.NewContext()
+		if err := md.Convert(data, &buf, parser.WithContext(context)); err != nil {
+			panic(err)
+		}
+		metaData := meta.Get(context)
+
+		entry := BlogEntry{}
+		entry.Pattern = strings.TrimSuffix(file.Name(), filepath.Ext(file.Name()))
+		if v, ok := metaData["Title"]; ok == true {
+			entry.Title = v.(string)
+		}
+		if v, ok := metaData["Date"]; ok == true {
+			layoutIn := "02/01/2006"
+			layoutOut := "02 Jun 2006"
+			date, err := time.Parse(layoutIn, v.(string))
+			if err != nil {
+				panic(err)
+			}
+			entry.Date = date.Format(layoutOut)
+		}
+
+		blogEntries = append(blogEntries, entry)
+	}
+	config.tmpl.ExecuteTemplate(w, "blog.go.html", map[string]any{
+		"uptime":      math.Round(time.Now().Sub(startTime).Seconds()),
+		"cmd":         os.Args[0],
+		"blogEntries": blogEntries,
+	})
+}
+
 func setupConfig() {
-	configPath := flag.String("config", "config.toml", "Path for the configuration")
+	configPath := flag.String("config", "config.toml", "Path for the configuration.")
+	flag.BoolVar(&config.Http.Tls, "tls", false, "Wether to enable TLS.")
+	flag.StringVar(&config.Http.Addr, "addr", ":8080", "Address to bind.")
+	flag.StringVar(&config.Http.CertFile, "certKey", "", "Path for the TLS certificate key.")
+	flag.StringVar(&config.Http.KeyFile, "keyFile", "", "Path for the TLS private key file.")
 	flag.Parse()
 
 	source, err := os.ReadFile(*configPath)
@@ -107,6 +204,7 @@ func setupConfig() {
 		log.Fatal(err)
 	}
 
+	flag.Parse()
 }
 
 func main() {
@@ -125,6 +223,8 @@ func main() {
 	}
 
 	mux.HandleFunc("/resume", mkServeMarkdown("markdown/resume.md"))
+	//mux.HandleFunc("/test", mkServeMarkdown("test.md"))
+	mux.HandleFunc("/blog/", serveBlog)
 
 	switch config.Http.Tls {
 	case false:
