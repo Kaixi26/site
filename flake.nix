@@ -26,9 +26,11 @@
       pkgs.entr
     ];
 
+    site-src = pkgs.lib.cleanSource ./.;
+
     site = pkgs.buildGoModule {
       name = "site";
-      src = ./.;
+      src = site-src;
       vendorSha256 = "sha256-mB14LBiZnDlPzm8eYTYSHcqLC7K1Us6KCnWaDYqYAsA=";
       runVend = true;
 
@@ -45,12 +47,12 @@
 
     defaultPackage.x86_64-linux = pkgs.stdenv.mkDerivation {
       name = "kaixi-site";
-      src = ./.;
+      src = site-src;
       propagatedBuildInputs = [ site ];
       installPhase = ''
         mkdir -p "$out/bin/"
         mkdir -p "$out/share/site/"
-        mv config.toml markdown static templates $out/share/site/
+        mv config.toml markdown blog static templates $out/share/site/
         printf "#!/bin/sh\ncd $out/share/site\n${site}/bin/site \$@\n" > $out/bin/site.sh
         chmod +x $out/bin/site.sh
       '';

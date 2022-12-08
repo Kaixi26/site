@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -178,6 +179,9 @@ func serveBlog(w http.ResponseWriter, r *http.Request) {
 
 		blogEntries = append(blogEntries, entry)
 	}
+	sort.Slice(blogEntries, func(i, j int) bool {
+		return blogEntries[i].Date < blogEntries[j].Date
+	})
 	config.tmpl.ExecuteTemplate(w, "blog.go.html", map[string]any{
 		"uptime":      math.Round(time.Now().Sub(startTime).Seconds()),
 		"cmd":         os.Args[0],
@@ -228,8 +232,10 @@ func main() {
 
 	switch config.Http.Tls {
 	case false:
+		log.Printf("Listening http on %s", config.Http.Addr)
 		log.Fatal(http.ListenAndServe(config.Http.Addr, mux))
 	case true:
+		log.Printf("Listening https on %s", config.Http.Addr)
 		log.Fatal(http.ListenAndServeTLS(config.Http.Addr, config.Http.CertFile, config.Http.KeyFile, mux))
 	}
 }
