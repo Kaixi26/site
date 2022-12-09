@@ -169,7 +169,7 @@ func serveBlog(w http.ResponseWriter, r *http.Request) {
 		}
 		if v, ok := metaData["Date"]; ok == true {
 			layoutIn := "02/01/2006"
-			layoutOut := "02 Jun 2006"
+			layoutOut := "02 Jan 2006"
 			date, err := time.Parse(layoutIn, v.(string))
 			if err != nil {
 				panic(err)
